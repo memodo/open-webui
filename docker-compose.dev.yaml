@@ -1,0 +1,58 @@
+name: open-webui-dev
+# docker compose -f docker-compose.dev.yaml up --watch
+
+services:
+  frontend:
+    container_name: open-webui-dev-frontend
+    build:
+      context: .
+      target: build
+    command: ["npm", "run", "dev"]
+    depends_on:
+      - backend
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "3000:5173"
+    develop:
+      watch:
+        path: ./src
+        action: sync
+
+  backend:
+    container_name: open-webui-dev-backend
+    build:
+      context: .
+      target: base
+    command: ["bash", "dev.sh"]
+    env_file: ".env"
+    environment:
+      - ENV=dev
+      - WEBUI_AUTH=False
+    volumes:
+      - ./backend/data:/app/backend/data
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "8080:8080"
+    restart: always
+    develop:
+      watch:
+        path: ./backend
+        action: sync
+
+  # https://docs.openwebui.com/getting-started/development#-integration-with-pipelines
+  # Not clear how this will run, since Pipelines are another project ???
+  pipelines:
+    container_name: open-webui-dev-pipelines
+    ports:
+      - "9099:9099"
+    volumes:
+      - ./pipelines:/app/pipelines
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: always
+
+volumes:
+  data:
+    external: true
