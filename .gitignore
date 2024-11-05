@@ -309,4 +309,4 @@ cypress/screenshots
 .vscode/settings.json
 
 # vector data
-chroma/data
+chroma/chroma_data

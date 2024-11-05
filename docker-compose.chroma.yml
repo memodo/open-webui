@@ -5,7 +5,8 @@ services:
     image: local-open-webui:latest
     container_name: open-webui
     depends_on:
-      - chromadb
+      chromadb:
+        condition: service_healthy
     volumes:
       - ./backend/data:/app/backend/data
     environment:
@@ -13,7 +14,7 @@ services:
       DATA_DIR: /app/backend/data # Absolute path inside the container
       OLLAMA_BASE_URLS: http://host.docker.internal:11434
       CHROMA_HTTP_PORT: 8000
-      CHROMA_HTTP_HOST: chromadb
+      CHROMA_HTTP_HOST: open-webui-chromadb
       CHROMA_TENANT: default_tenant
       VECTOR_DB: chroma
       ENABLE_OPENAI_API: "True"
@@ -24,20 +25,17 @@ services:
       RAG_EMBEDDING_MODEL: nomic-embed-text-v1.5
       RAG_EMBEDDING_MODEL_TRUST_REMOTE_CODE: "True"
     ports:
-      - "3000:8080"
+      - 3000:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+    networks:
+      - open-webui-net
+    restart: on-failure:3
   
   chromadb:
     image: chromadb/chroma:latest
-    container_name: chromadb
-    hostname: chromadb
+    container_name: open-webui-chromadb
+    hostname: open-webui-chromadb
     volumes:
       - ./chroma/chroma_data:/chroma/chroma
     environment:
@@ -47,19 +45,19 @@ services:
       - ANONYMIZED_TELEMETRY=${ANONYMIZED_TELEMETRY:-TRUE}
     ports:
       - 8000:8000
-    network_mode: ${NETWORK_MODE:-bridge}
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+    networks:
+      - open-webui-net
+    restart: on-failure:3
     healthcheck: 
       test: ["CMD-SHELL", "curl localhost:8000/api/v1/heartbeat || exit 1"]
       interval: 10s
-      retries: 2
-      start_period: 5s
+      retries: 5
+      start_period: 15s
       timeout: 10s
+
+networks:
+  open-webui-net:
+    driver: bridge
 
 # The external: true flag means volumes must be created before running docker compose up:
 # docker volume create open_webui_data
