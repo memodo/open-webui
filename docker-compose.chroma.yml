@@ -1,0 +1,72 @@
+# example from https://github.com/DomPolizzi/OpenWebUi-Ollama-chroma-docker-swarm
+
+services:
+  openWebUI:
+    image: local-open-webui:latest
+    container_name: open-webui
+    depends_on:
+      - chromadb
+    volumes:
+      - ./backend/data:/app/backend/data
+    environment:
+      ENV: dev
+      DATA_DIR: /app/backend/data # Absolute path inside the container
+      OLLAMA_BASE_URLS: http://host.docker.internal:11434
+      CHROMA_HTTP_PORT: 8000
+      CHROMA_HTTP_HOST: chromadb
+      CHROMA_TENANT: default_tenant
+      VECTOR_DB: chroma
+      ENABLE_OPENAI_API: "True"
+      WEBUI_NAME: Memodo
+      CORS_ALLOW_ORIGIN: "*" # This is the current Default, will need to change before going live
+      # RAG_TEMPLATE:
+      RAG_EMBEDDING_ENGINE: ollama
+      RAG_EMBEDDING_MODEL: nomic-embed-text-v1.5
+      RAG_EMBEDDING_MODEL_TRUST_REMOTE_CODE: "True"
+    ports:
+      - "3000:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+  
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    hostname: chromadb
+    volumes:
+      - ./chroma/chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ALLOW_RESET=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=${ANONYMIZED_TELEMETRY:-TRUE}
+    ports:
+      - 8000:8000
+    network_mode: ${NETWORK_MODE:-bridge}
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+    healthcheck: 
+      test: ["CMD-SHELL", "curl localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 10s
+      retries: 2
+      start_period: 5s
+      timeout: 10s
+
+# The external: true flag means volumes must be created before running docker compose up:
+# docker volume create open_webui_data
+# docker volume create chroma_data
+#
+# volumes:
+#  open_webui_data:
+#    external: true
+#  chroma_data:
+#    external: true
