@@ -59,7 +59,7 @@ networks:
   open-webui-net:
     driver: bridge
 
-# The external: true flag means volumes must be created before running docker compose up:
+# The external: true flag means named volumes must be created before running docker compose up:
 # docker volume create open_webui_data
 # docker volume create chroma_data
 #
