@@ -113,6 +113,8 @@ from langchain_community.document_loaders import (
     YoutubeLoader,
 )
 from langchain_core.documents import Document
+from langchain_ollama import OllamaEmbeddings
+from langchain_experimental.text_splitter import SemanticChunker
 
 
 log = logging.getLogger(__name__)
@@ -661,11 +663,13 @@ def save_docs_to_vector_db(
 
     if split:
         if app.state.config.TEXT_SPLITTER in ["", "character"]:
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=app.state.config.CHUNK_SIZE,
-                chunk_overlap=app.state.config.CHUNK_OVERLAP,
-                add_start_index=True,
-            )
+            # text_splitter = RecursiveCharacterTextSplitter(
+            #     chunk_size=app.state.config.CHUNK_SIZE,
+            #     chunk_overlap=app.state.config.CHUNK_OVERLAP,
+            #     add_start_index=True,
+            # )
+            ollama_emb = OllamaEmbeddings(model=app.state.config.RAG_EMBEDDING_MODEL, base_url=f"http://{app.state.config.CHROMA_HOST}:{app.state.config.CHROMA_PORT}")
+            text_splitter = SemanticChunker(embeddings=ollama_emb)
         elif app.state.config.TEXT_SPLITTER == "token":
             log.info(
                 f"Using token text splitter: {app.state.config.TIKTOKEN_ENCODING_NAME}"
