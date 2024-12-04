@@ -8,7 +8,7 @@ requirements: langchain-ollama
 """
 
 from typing import List, Optional, Callable, Awaitable
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 import time
 import chromadb
 
@@ -23,12 +23,14 @@ from pydantic import BaseModel
 
 class Pipe:
     class Valves(BaseModel):
+        model_config = ConfigDict(arbitrary_types_allowed=True)
+
         collection_name: str = Field(default="product_management", description="The name of the collection used in the ChromaDB database. The collection name must be between 3 and 63 characters long, start and end with a lowercase letter or a digit, and can only include dots, dashes, and underscores in between.")
         ollama_host: str = Field(default="host.docker.internal")
         ollama_port: str = Field(default="11434")
         chroma_host: str = Field(default="host.docker.internal")
         chroma_port: str = Field(default="8000")
-        embeddingModel: str = Field(default="bge-m3:latest")
+        embeddingModel: str = Field(default="paraphrase-multilingual")
         chatModel: str = Field(default="llama3.2:3b")
         emit_interval: float = Field(
             default=2.0, description="Interval in seconds between status emissions"
