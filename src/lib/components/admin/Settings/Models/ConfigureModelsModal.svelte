@@ -18,7 +18,7 @@
 	import Plus from '$lib/components/icons/Plus.svelte';
 
 	export let show = false;
-	export let init = () => {};
+	export let initHandler = () => {};
 
 	let config = null;
 
@@ -29,28 +29,18 @@
 	let loading = false;
 	let showResetModal = false;
 
-	const submitHandler = async () => {
-		loading = true;
+	$: if (show) {
+		init();
+	}
 
-		const res = await setModelsConfig(localStorage.token, {
-			DEFAULT_MODELS: defaultModelIds.join(','),
-			MODEL_ORDER_LIST: modelIds
-		});
-
-		if (res) {
-			toast.success($i18n.t('Models configuration saved successfully'));
-			init();
-			show = false;
-		} else {
-			toast.error($i18n.t('Failed to save models configuration'));
-		}
-
-		loading = false;
-	};
-
-	onMount(async () => {
+	const init = async () => {
 		config = await getModelsConfig(localStorage.token);
 
+		if (config?.DEFAULT_MODELS) {
+			defaultModelIds = (config?.DEFAULT_MODELS).split(',').filter((id) => id);
+		} else {
+			defaultModelIds = [];
+		}
 		const modelOrderList = config.MODEL_ORDER_LIST || [];
 		const allModelIds = $models.map((model) => model.id);
 
@@ -63,18 +53,40 @@
 			// Add remaining IDs not in MODEL_ORDER_LIST, sorted alphabetically
 			...allModelIds.filter((id) => !orderedSet.has(id)).sort((a, b) => a.localeCompare(b))
 		];
+	};
+	const submitHandler = async () => {
+		loading = true;
+
+		const res = await setModelsConfig(localStorage.token, {
+			DEFAULT_MODELS: defaultModelIds.join(','),
+			MODEL_ORDER_LIST: modelIds
+		});
+
+		if (res) {
+			toast.success($i18n.t('Models configuration saved successfully'));
+			initHandler();
+			show = false;
+		} else {
+			toast.error($i18n.t('Failed to save models configuration'));
+		}
+
+		loading = false;
+	};
+
+	onMount(async () => {
+		init();
 	});
 </script>
 
 <ConfirmDialog
-	title={$i18n.t('Delete All Models')}
+	title={$i18n.t('Reset All Models')}
 	message={$i18n.t('This will delete all models including custom models and cannot be undone.')}
 	bind:show={showResetModal}
 	onConfirm={async () => {
 		const res = deleteAllModels(localStorage.token);
 		if (res) {
 			toast.success($i18n.t('All models deleted successfully'));
-			init();
+			initHandler();
 		}
 	}}
 />
@@ -180,6 +192,10 @@
 										<button
 											type="button"
 											on:click={() => {
+												if (selectedModelId === '') {
+													return;
+												}
+
 												if (defaultModelIds.includes(selectedModelId)) {
 													return;
 												}
@@ -204,7 +220,8 @@
 										showResetModal = true;
 									}}
 								>
-									{$i18n.t('Delete All Models')}
+									<!-- {$i18n.t('Delete All Models')} -->
+									{$i18n.t('Reset All Models')}
 								</button>
 							</Tooltip>
 

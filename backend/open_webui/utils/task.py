@@ -16,6 +16,22 @@ log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["RAG"])
 
 
+def get_task_model_id(
+    default_model_id: str, task_model: str, task_model_external: str, models
+) -> str:
+    # Set the task model
+    task_model_id = default_model_id
+    # Check if the user has a custom task model and use that model
+    if models[task_model_id]["owned_by"] == "ollama":
+        if task_model and task_model in models:
+            task_model_id = task_model
+    else:
+        if task_model_external and task_model_external in models:
+            task_model_id = task_model_external
+
+    return task_model_id
+
+
 def prompt_template(
     template: str, user_name: Optional[str] = None, user_location: Optional[str] = None
 ) -> str:
@@ -25,12 +41,14 @@ def prompt_template(
     # Format the date to YYYY-MM-DD
     formatted_date = current_date.strftime("%Y-%m-%d")
     formatted_time = current_date.strftime("%I:%M:%S %p")
+    formatted_weekday = current_date.strftime("%A")
 
     template = template.replace("{{CURRENT_DATE}}", formatted_date)
     template = template.replace("{{CURRENT_TIME}}", formatted_time)
     template = template.replace(
         "{{CURRENT_DATETIME}}", f"{formatted_date} {formatted_time}"
     )
+    template = template.replace("{{CURRENT_WEEKDAY}}", formatted_weekday)
 
     if user_name:
         # Replace {{USER_NAME}} in the template with the user's name
@@ -51,7 +69,9 @@ def prompt_template(
 
 def replace_prompt_variable(template: str, prompt: str) -> str:
     def replacement_function(match):
-        full_match = match.group(0)
+        full_match = match.group(
+            0
+        ).lower()  # Normalize to lowercase for consistent handling
         start_length = match.group(1)
         end_length = match.group(2)
         middle_length = match.group(3)
@@ -71,20 +91,23 @@ def replace_prompt_variable(template: str, prompt: str) -> str:
             return f"{start}...{end}"
         return ""
 
-    template = re.sub(
-        r"{{prompt}}|{{prompt:start:(\d+)}}|{{prompt:end:(\d+)}}|{{prompt:middletruncate:(\d+)}}",
-        replacement_function,
-        template,
-    )
+    # Updated regex pattern to make it case-insensitive with the `(?i)` flag
+    pattern = r"(?i){{prompt}}|{{prompt:start:(\d+)}}|{{prompt:end:(\d+)}}|{{prompt:middletruncate:(\d+)}}"
+    template = re.sub(pattern, replacement_function, template)
     return template
 
 
-def replace_messages_variable(template: str, messages: list[str]) -> str:
+def replace_messages_variable(
+    template: str, messages: Optional[list[str]] = None
+) -> str:
     def replacement_function(match):
         full_match = match.group(0)
         start_length = match.group(1)
         end_length = match.group(2)
         middle_length = match.group(3)
+        # If messages is None, handle it as an empty list
+        if messages is None:
+            return ""
 
         # Process messages based on the number of messages required
         if full_match == "{{MESSAGES}}":
@@ -120,7 +143,7 @@ def replace_messages_variable(template: str, messages: list[str]) -> str:
 
 
 def rag_template(template: str, context: str, query: str):
-    if template == "":
+    if template.strip() == "":
         template = DEFAULT_RAG_TEMPLATE
 
     if "[context]" not in template and "{{CONTEXT}}" not in template:
@@ -207,6 +230,28 @@ def emoji_generation_template(
         ),
     )
 
+    return template
+
+
+def autocomplete_generation_template(
+    template: str,
+    prompt: str,
+    messages: Optional[list[dict]] = None,
+    type: Optional[str] = None,
+    user: Optional[dict] = None,
+) -> str:
+    template = template.replace("{{TYPE}}", type if type else "")
+    template = replace_prompt_variable(template, prompt)
+    template = replace_messages_variable(template, messages)
+
+    template = prompt_template(
+        template,
+        **(
+            {"user_name": user.get("name"), "user_location": user.get("location")}
+            if user
+            else {}
+        ),
+    )
     return template
 
 
